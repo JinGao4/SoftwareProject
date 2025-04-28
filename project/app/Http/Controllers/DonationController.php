@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Stripe\Stripe;
+use Stripe\Charge;
 
 class DonationController extends Controller
 {
@@ -32,5 +34,29 @@ class DonationController extends Controller
     $campaign->increment('current_amount', $validated['amount']);
 
     return back()->with('success', 'Thank you for your donation!');
+
+    
+    Stripe::setApiKey(config('services.stripe.secret'));
+
+    try {
+        $charge = Charge::create([
+            'amount' => $validated['amount'] * 100, // in cents
+            'currency' => 'usd',
+            'source' => $request->stripeToken,
+            'description' => 'Donation to ' . $campaign->title,
+        ]);
+
+        // Create donation record
+        $donation = Donation::create($validated);
+
+        // Update campaign amount
+        $campaign->increment('current_amount', $validated['amount']);
+
+        return back()->with('success', 'Thank you for your donation!');
+
+    } catch (\Exception $e) {
+        return back()->with('error', $e->getMessage());
+    }
 }
 }
+
