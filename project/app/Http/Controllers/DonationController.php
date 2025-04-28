@@ -2,39 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Donation;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class DonationController extends Controller
 {
-    public function index()
-    {
-        return view('donate');
+    public function store(Request $request, Campaign $campaign)
+{
+    $validated = $request->validate([
+        'amount' => 'required|numeric|min:1',
+        'name' => 'required_if:is_anonymous,false|string|max:255',
+        'email' => 'required_if:is_anonymous,false|email',
+        'message' => 'nullable|string',
+        'is_anonymous' => 'boolean',
+    ]);
+
+    if ($validated['is_anonymous']) {
+        $validated['name'] = 'Anonymous';
+        $validated['email'] = 'anonymous@example.com';
+    } else {
+        $validated['user_id'] = auth()->id();
     }
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required',
-            'amount' => 'required|numeric|min:1',
-        ]);
+    $validated['campaign_id'] = $campaign->id;
 
-        Donation::create([
-            'name' => $request->name,
-            'amount' => $request->amount,
-            'status' => 'completed',
-        ]);
+    Donation::create($validated);
 
-        return redirect()->back()->with('success', 'Thank you for your donation!');
-    }
+    // Update campaign current amount
+    $campaign->increment('current_amount', $validated['amount']);
 
-    public function cancel($id)
-    {
-        $donation = Donation::findOrFail($id);
-        $donation->status = 'cancelled';
-        $donation->save();
-
-        return redirect()->back()->with('success', 'Donation cancelled.');
-    }
+    return back()->with('success', 'Thank you for your donation!');
 }
-
+}
